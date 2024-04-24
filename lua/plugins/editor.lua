@@ -8,7 +8,17 @@ return {
 				require("telescope").load_extension("fzf")
 			end,
 		},
+		lazy = true,
 	},
+	-- comments
+	{
+		"numToStr/Comment.nvim",
+		opts = {
+			-- add any options here
+		},
+		lazy = true,
+	},
+	-- html and jsx | tsx auto tag closing
 	{
 		"windwp/nvim-ts-autotag",
 		ft = {
@@ -16,17 +26,20 @@ return {
 			"javascriptreact",
 			"typescript",
 			"typescriptreact",
+			"html",
 		},
 		config = function()
 			require("nvim-ts-autotag").setup()
 		end,
 	},
+	-- cummon snippets
 	{
 		"L3MON4D3/LuaSnip",
 		keys = function()
 			return {}
 		end,
 	},
+	-- auto completion plugin
 	{
 		"hrsh7th/nvim-cmp",
 		dependencies = {
@@ -75,36 +88,20 @@ return {
 			})
 		end,
 	},
-	{
-		"neovim/nvim-lspconfig",
-		opts = {
-			servers = { eslint = {} },
-			setup = {
-				eslint = function()
-					require("lazyvim.util").lsp.on_attach(function(client)
-						if client.name == "eslint" then
-							client.server_capabilities.documentFormattingProvider = true
-						elseif client.name == "tsserver" then
-							client.server_capabilities.documentFormattingProvider = false
-						end
-					end)
-				end,
-			},
-		},
-	},
+	-- tabs
 	{
 		"akinsho/bufferline.nvim",
 		event = "VeryLazy",
 		keys = {
-			{ "<leader>bp", "<Cmd>BufferLineTogglePin<CR>", desc = "Toggle pin" },
-			{ "<leader>bP", "<Cmd>BufferLineGroupClose ungrouped<CR>", desc = "Delete non-pinned buffers" },
-			{ "<leader>bo", "<Cmd>BufferLineCloseOthers<CR>", desc = "Delete other buffers" },
-			{ "<leader>br", "<Cmd>BufferLineCloseRight<CR>", desc = "Delete buffers to the right" },
-			{ "<leader>bl", "<Cmd>BufferLineCloseLeft<CR>", desc = "Delete buffers to the left" },
+			{ "<S-m>", "<Cmd>BufferLineTogglePin<CR>", desc = "Toggle pin" },
+			{ "<C-c>", "<Cmd>BufferLineGroupClose ungrouped<CR>", desc = "Delete non-pinned buffers" },
+			{ "<C-e>", "<Cmd>BufferLineCloseOthers<CR>", desc = "Delete other buffers" },
+			-- { "<leader>br", "<Cmd>BufferLineCloseRight<CR>", desc = "Delete buffers to the right" },
+			-- { "<leader>bl", "<Cmd>BufferLineCloseLeft<CR>", desc = "Delete buffers to the left" },
 			{ "<S-h>", "<cmd>BufferLineCyclePrev<cr>", desc = "Prev buffer" },
 			{ "<S-l>", "<cmd>BufferLineCycleNext<cr>", desc = "Next buffer" },
-			{ "[b", "<cmd>BufferLineCyclePrev<cr>", desc = "Prev buffer" },
-			{ "]b", "<cmd>BufferLineCycleNext<cr>", desc = "Next buffer" },
+			-- { "[b", "<cmd>BufferLineCyclePrev<cr>", desc = "Prev buffer" },
+			-- { "]b", "<cmd>BufferLineCycleNext<cr>", desc = "Next buffer" },
 		},
 		opts = {
 			options = {
@@ -143,32 +140,6 @@ return {
 		end,
 	},
 	{
-		"nvim-cmp",
-		dependencies = {
-			-- codeium
-			{
-				"Exafunction/codeium.nvim",
-				cmd = "Codeium",
-				build = ":Codeium Auth",
-				opts = {},
-			},
-		},
-		---@param opts cmp.ConfigSchema
-		opts = function(_, opts)
-			table.insert(opts.sources, 1, {
-				name = "codeium",
-				group_index = 1,
-				priority = 100,
-			})
-		end,
-	},
-	{
-		"Exafunction/codeium.nvim",
-		cmd = "Codeium",
-		build = ":Codeium Auth",
-		opts = {},
-	},
-	{
 		"neovim/nvim-lspconfig",
 		opts = {
 			servers = {
@@ -179,6 +150,70 @@ return {
 					filetypes_include = {},
 					-- to fully override the default_config, change the below
 					-- filetypes = {}
+				},
+				tsserver = {
+					on_attach = function(client)
+						-- this is important, otherwise tsserver will format ts/js
+						-- files which we *really* don't want.
+						client.server_capabilities.documentFormattingProvider = false
+					end,
+				},
+				biome = {},
+				rust_analyzer = {
+					keys = {
+						{ "K", "<cmd>RustHoverActions<cr>", desc = "Hover Actions (Rust)" },
+						{
+							"<leader>cR",
+							"<cmd>RustCodeAction<cr>",
+							desc = "Code Action (Rust)",
+						},
+						{
+							"<leader>dr",
+							"<cmd>RustDebuggables<cr>",
+							desc = "Run Debuggables (Rust)",
+						},
+					},
+					settings = {
+						["rust-analyzer"] = {
+							cargo = {
+								allFeatures = true,
+								loadOutDirsFromCheck = true,
+								runBuildScripts = true,
+							},
+							-- Add clippy lints for Rust.
+							checkOnSave = {
+								allFeatures = true,
+								command = "clippy",
+								extraArgs = { "--no-deps" },
+							},
+							procMacro = {
+								enable = true,
+								ignored = {
+									["async-trait"] = { "async_trait" },
+									["napi-derive"] = { "napi" },
+									["async-recursion"] = { "async_recursion" },
+								},
+							},
+						},
+					},
+				},
+			},
+			taplo = {
+				keys = {
+					{
+						"K",
+						function()
+							if
+								vim.fn.expand("%:t") == "Cargo.toml"
+								and require("crates").popup_available()
+							then
+								require("crates").show_popup()
+							else
+								vim.lsp.buf.hover()
+							end
+						end,
+						desc = "Show Crate Documentation",
+					},
 				},
 			},
 			setup = {
@@ -198,7 +233,77 @@ return {
 					-- Add additional filetypes
 					vim.list_extend(opts.filetypes, opts.filetypes_include or {})
 				end,
+				rust_analyzer = function(_, opts)
+					local rust_tools_opts = require("lazyvim.util").opts("rust-tools.nvim")
+					require("rust-tools").setup(
+						vim.tbl_deep_extend("force", rust_tools_opts or {}, { server = opts })
+					)
+					return true
+				end,
 			},
 		},
+	},
+	{
+		"Saecki/crates.nvim",
+		event = { "BufRead Cargo.toml" },
+		opts = {
+			src = {
+				cmp = { enabled = true },
+			},
+		},
+		lazy = true,
+	},
+	{
+		"nvim-treesitter/nvim-treesitter",
+		opts = function(_, opts)
+			if type(opts.ensure_installed) == "table" then
+				vim.list_extend(opts.ensure_installed, { "ron", "rust", "toml" })
+			end
+		end,
+		lazy = true,
+	},
+	{
+		"simrat39/rust-tools.nvim",
+		lazy = true,
+		opts = function()
+			local ok, mason_registry = pcall(require, "mason-registry")
+			local adapter ---@type any
+			if ok then
+				-- rust tools configuration for debugging support
+				local codelldb = mason_registry.get_package("codelldb")
+				local extension_path = codelldb:get_install_path() .. "/extension/"
+				local codelldb_path = extension_path .. "adapter/codelldb"
+				local liblldb_path = ""
+				if vim.loop.os_uname().sysname:find("Windows") then
+					liblldb_path = extension_path .. "lldb\\bin\\liblldb.dll"
+				elseif vim.fn.has("mac") == 1 then
+					liblldb_path = extension_path .. "lldb/lib/liblldb.dylib"
+				else
+					liblldb_path = extension_path .. "lldb/lib/liblldb.so"
+				end
+				adapter = require("rust-tools.dap").get_codelldb_adapter(codelldb_path, liblldb_path)
+			end
+			return {
+				dap = {
+					adapter = adapter,
+				},
+				tools = {
+					on_initialized = function()
+						vim.cmd([[
+                augroup RustLSP
+                  autocmd CursorHold                      *.rs silent! lua vim.lsp.buf.document_highlight()
+                  autocmd CursorMoved,InsertEnter         *.rs silent! lua vim.lsp.buf.clear_references()
+                  autocmd BufEnter,CursorHold,InsertLeave *.rs silent! lua vim.lsp.codelens.refresh()
+                augroup END
+              ]])
+					end,
+				},
+			}
+		end,
+		config = function() end,
+	},
+	{
+		"rouge8/neotest-rust",
+		lazy = true,
 	},
 }
