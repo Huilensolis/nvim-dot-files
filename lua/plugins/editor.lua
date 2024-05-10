@@ -44,6 +44,15 @@ return {
 		"hrsh7th/nvim-cmp",
 		dependencies = {
 			"hrsh7th/cmp-emoji",
+			{
+				"Saecki/crates.nvim",
+				event = { "BufRead Cargo.toml" },
+				opts = {
+					src = {
+						cmp = { enabled = true },
+					},
+				},
+			},
 		},
 		---@param opts cmp.ConfigSchema
 		opts = function(_, opts)
@@ -96,12 +105,8 @@ return {
 			{ "<S-m>", "<Cmd>BufferLineTogglePin<CR>", desc = "Toggle pin" },
 			{ "<C-c>", "<Cmd>BufferLineGroupClose ungrouped<CR>", desc = "Delete non-pinned buffers" },
 			{ "<C-e>", "<Cmd>BufferLineCloseOthers<CR>", desc = "Delete other buffers" },
-			-- { "<leader>br", "<Cmd>BufferLineCloseRight<CR>", desc = "Delete buffers to the right" },
-			-- { "<leader>bl", "<Cmd>BufferLineCloseLeft<CR>", desc = "Delete buffers to the left" },
 			{ "<S-h>", "<cmd>BufferLineCyclePrev<cr>", desc = "Prev buffer" },
 			{ "<S-l>", "<cmd>BufferLineCycleNext<cr>", desc = "Next buffer" },
-			-- { "[b", "<cmd>BufferLineCyclePrev<cr>", desc = "Prev buffer" },
-			-- { "]b", "<cmd>BufferLineCycleNext<cr>", desc = "Next buffer" },
 		},
 		opts = {
 			options = {
@@ -157,20 +162,57 @@ return {
 						-- files which we *really* don't want.
 						client.server_capabilities.documentFormattingProvider = false
 					end,
+					keys = {
+						{
+							"<leader>co",
+							function()
+								vim.lsp.buf.code_action({
+									apply = true,
+									context = {
+										only = { "source.organizeImports.ts" },
+										diagnostics = {},
+									},
+								})
+							end,
+							desc = "Organize Imports",
+						},
+						{
+							"<leader>cR",
+							function()
+								vim.lsp.buf.code_action({
+									apply = true,
+									context = {
+										only = { "source.removeUnused.ts" },
+										diagnostics = {},
+									},
+								})
+							end,
+							desc = "Remove Unused Imports",
+						},
+					},
+					---@diagnostic disable-next-line: missing-fields
+					settings = {
+						completions = {
+							completeFunctionCalls = true,
+						},
+					},
 				},
 				biome = {},
 				rust_analyzer = {
 					keys = {
-						{ "K", "<cmd>RustHoverActions<cr>", desc = "Hover Actions (Rust)" },
 						{
-							"<leader>cR",
-							"<cmd>RustCodeAction<cr>",
-							desc = "Code Action (Rust)",
-						},
-						{
-							"<leader>dr",
-							"<cmd>RustDebuggables<cr>",
-							desc = "Run Debuggables (Rust)",
+							"K",
+							function()
+								if
+									vim.fn.expand("%:t") == "Cargo.toml"
+									and require("crates").popup_available()
+								then
+									require("crates").show_popup()
+								else
+									vim.lsp.buf.hover()
+								end
+							end,
+							desc = "Show Crate Documentation",
 						},
 					},
 					settings = {
@@ -195,24 +237,6 @@ return {
 								},
 							},
 						},
-					},
-				},
-			},
-			taplo = {
-				keys = {
-					{
-						"K",
-						function()
-							if
-								vim.fn.expand("%:t") == "Cargo.toml"
-								and require("crates").popup_available()
-							then
-								require("crates").show_popup()
-							else
-								vim.lsp.buf.hover()
-							end
-						end,
-						desc = "Show Crate Documentation",
 					},
 				},
 			},
@@ -242,6 +266,16 @@ return {
 				end,
 			},
 		},
+		rust_analyzer = function()
+			return true
+		end,
+	},
+	{
+		"williamboman/mason.nvim",
+		opts = function(_, opts)
+			opts.ensure_installed = opts.ensure_installed or {}
+			table.insert(opts.ensure_installed, "js-debug-adapter")
+		end,
 	},
 	{
 		"Saecki/crates.nvim",
@@ -257,7 +291,7 @@ return {
 		"nvim-treesitter/nvim-treesitter",
 		opts = function(_, opts)
 			if type(opts.ensure_installed) == "table" then
-				vim.list_extend(opts.ensure_installed, { "ron", "rust", "toml" })
+				vim.list_extend(opts.ensure_installed, { "ron", "rust", "toml", "typescript", "tsx" })
 			end
 		end,
 		lazy = true,
@@ -305,5 +339,49 @@ return {
 	{
 		"rouge8/neotest-rust",
 		lazy = true,
+	},
+	{
+		"mrcjkb/rustaceanvim",
+		version = "^4", -- Recommended
+		ft = { "rust" },
+		opts = {
+			server = {
+				on_attach = function(_, bufnr)
+					vim.keymap.set("n", "<leader>cR", function()
+						vim.cmd.RustLsp("codeAction")
+					end, { desc = "Code Action", buffer = bufnr })
+					vim.keymap.set("n", "<leader>dr", function()
+						vim.cmd.RustLsp("debuggables")
+					end, { desc = "Rust Debuggables", buffer = bufnr })
+				end,
+				default_settings = {
+					-- rust-analyzer language server configuration
+					["rust-analyzer"] = {
+						cargo = {
+							allFeatures = true,
+							loadOutDirsFromCheck = true,
+							runBuildScripts = true,
+						},
+						-- Add clippy lints for Rust.
+						checkOnSave = {
+							allFeatures = true,
+							command = "clippy",
+							extraArgs = { "--no-deps" },
+						},
+						procMacro = {
+							enable = true,
+							ignored = {
+								["async-trait"] = { "async_trait" },
+								["napi-derive"] = { "napi" },
+								["async-recursion"] = { "async_recursion" },
+							},
+						},
+					},
+				},
+			},
+		},
+		config = function(_, opts)
+			vim.g.rustaceanvim = vim.tbl_deep_extend("keep", vim.g.rustaceanvim or {}, opts or {})
+		end,
 	},
 }
