@@ -1,8 +1,13 @@
 {
-  "extras": ["lazyvim.plugins.extras.lang.tailwind"],
+  "extras": [
+    "lazyvim.plugins.extras.lang.astro",
+    "lazyvim.plugins.extras.lang.docker",
+    "lazyvim.plugins.extras.lang.svelte",
+    "lazyvim.plugins.extras.lang.toml",
+    "lazyvim.plugins.extras.lang.vue"
+  ],
   "news": {
-    "NEWS.md": "3314"
+    "NEWS.md": "5950"
   },
-  "version": 3
+  "version": 6
 }
-

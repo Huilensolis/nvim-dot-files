@@ -48,7 +48,7 @@ return {
 				"Saecki/crates.nvim",
 				event = { "BufRead Cargo.toml" },
 				opts = {
-					src = {
+					completion = {
 						cmp = { enabled = true },
 					},
 				},
@@ -95,6 +95,10 @@ return {
 					end
 				end, { "i", "s" }),
 			})
+
+			-- rust config
+			opts.sources = opts.sources or {}
+			table.insert(opts.sources, { name = "crates" })
 		end,
 	},
 	-- tabs
@@ -162,9 +166,35 @@ return {
 						-- files which we *really* don't want.
 						client.server_capabilities.documentFormattingProvider = false
 					end,
+					settings = {
+						complete_function_calls = true,
+						vtsls = {
+							enableMoveToFileCodeAction = true,
+							autoUseWorkspaceTsdk = true,
+							experimental = {
+								completion = {
+									enableServerSideFuzzyMatch = true,
+								},
+							},
+						},
+						typescript = {
+							updateImportsOnFileMove = { enabled = "always" },
+							suggest = {
+								completeFunctionCalls = true,
+							},
+							inlayHints = {
+								enumMemberValues = { enabled = true },
+								functionLikeReturnTypes = { enabled = true },
+								parameterNames = { enabled = "literals" },
+								parameterTypes = { enabled = true },
+								propertyDeclarationTypes = { enabled = true },
+								variableTypes = { enabled = false },
+							},
+						},
+					},
 					keys = {
 						{
-							"<leader>co",
+							"<leader>oi",
 							function()
 								vim.lsp.buf.code_action({
 									apply = true,
@@ -177,7 +207,7 @@ return {
 							desc = "Organize Imports",
 						},
 						{
-							"<leader>cR",
+							"<leader>ru",
 							function()
 								vim.lsp.buf.code_action({
 									apply = true,
@@ -190,15 +220,27 @@ return {
 							desc = "Remove Unused Imports",
 						},
 					},
-					---@diagnostic disable-next-line: missing-fields
+				},
+				biome = {},
+				eslint = {
 					settings = {
-						completions = {
-							completeFunctionCalls = true,
+						-- helps eslint find the eslintrc when it's placed in a subfolder instead of the cwd root
+						workingDirectories = { mode = "auto" },
+						filetype = {
+							"javascript",
+							"javascriptreact",
+							"javascript.jsx",
+							"typescript",
+							"typescriptreact",
+							"typescript.tsx",
+							"vue",
+							"svelte",
+							"astro",
 						},
 					},
 				},
-				biome = {},
-				rust_analyzer = {
+				rust_analyzer = {},
+				taplo = {
 					keys = {
 						{
 							"K",
@@ -213,29 +255,6 @@ return {
 								end
 							end,
 							desc = "Show Crate Documentation",
-						},
-					},
-					settings = {
-						["rust-analyzer"] = {
-							cargo = {
-								allFeatures = true,
-								loadOutDirsFromCheck = true,
-								runBuildScripts = true,
-							},
-							-- Add clippy lints for Rust.
-							checkOnSave = {
-								allFeatures = true,
-								command = "clippy",
-								extraArgs = { "--no-deps" },
-							},
-							procMacro = {
-								enable = true,
-								ignored = {
-									["async-trait"] = { "async_trait" },
-									["napi-derive"] = { "napi" },
-									["async-recursion"] = { "async_recursion" },
-								},
-							},
 						},
 					},
 				},
@@ -257,31 +276,66 @@ return {
 					-- Add additional filetypes
 					vim.list_extend(opts.filetypes, opts.filetypes_include or {})
 				end,
-				rust_analyzer = function(_, opts)
-					local rust_tools_opts = require("lazyvim.util").opts("rust-tools.nvim")
-					require("rust-tools").setup(
-						vim.tbl_deep_extend("force", rust_tools_opts or {}, { server = opts })
-					)
+				tsserver = function()
+					return {
+						filetype = {
+							"javascript",
+							"javascriptreact",
+							"javascript.jsx",
+							"typescript",
+							"typescriptreact",
+							"typescript.tsx",
+						},
+					}
+				end,
+				eslint = function()
+					local function get_client(buf)
+						return LazyVim.lsp.get_clients({ name = "eslint", bufnr = buf })[1]
+					end
+
+					local formatter = LazyVim.lsp.formatter({
+						name = "eslint: lsp",
+						primary = false,
+						priority = 200,
+						filter = "eslint",
+					})
+
+					-- Use EslintFixAll on Neovim < 0.10.0
+					if not pcall(require, "vim.lsp._dynamic") then
+						formatter.name = "eslint: EslintFixAll"
+						formatter.sources = function(buf)
+							local client = get_client(buf)
+							return client and { "eslint" } or {}
+						end
+						formatter.format = function(buf)
+							local client = get_client(buf)
+							if client then
+								local diag = vim.diagnostic.get(buf, {
+									namespace = vim.lsp.diagnostic.get_namespace(
+										client.id
+									),
+								})
+								if #diag > 0 then
+									vim.cmd("EslintFixAll")
+								end
+							end
+						end
+					end
+
+					-- register the formatter with LazyVim
+					LazyVim.format.register(formatter)
+				end,
+				rust_analyzer = function()
 					return true
 				end,
 			},
 		},
-		rust_analyzer = function()
-			return true
-		end,
-	},
-	{
-		"williamboman/mason.nvim",
-		opts = function(_, opts)
-			opts.ensure_installed = opts.ensure_installed or {}
-			table.insert(opts.ensure_installed, "js-debug-adapter")
-		end,
 	},
 	{
 		"Saecki/crates.nvim",
 		event = { "BufRead Cargo.toml" },
 		opts = {
-			src = {
+			completion = {
 				cmp = { enabled = true },
 			},
 		},
@@ -291,7 +345,14 @@ return {
 		"nvim-treesitter/nvim-treesitter",
 		opts = function(_, opts)
 			if type(opts.ensure_installed) == "table" then
-				vim.list_extend(opts.ensure_installed, { "ron", "rust", "toml", "typescript", "tsx" })
+				vim.list_extend(opts.ensure_installed, {
+					"ron",
+					"rust",
+					"toml",
+					"typescript",
+					"tsx",
+					"javascript",
+				})
 			end
 		end,
 		lazy = true,
@@ -335,10 +396,6 @@ return {
 			}
 		end,
 		config = function() end,
-	},
-	{
-		"rouge8/neotest-rust",
-		lazy = true,
 	},
 	{
 		"mrcjkb/rustaceanvim",
