@@ -1,15 +1,4 @@
 return {
-	{
-		"telescope.nvim",
-		dependencies = {
-			"nvim-telescope/telescope-fzf-native.nvim",
-			build = "make",
-			config = function()
-				require("telescope").load_extension("fzf")
-			end,
-		},
-		lazy = true,
-	},
 	-- comments
 	{
 		"numToStr/Comment.nvim",
@@ -126,14 +115,6 @@ return {
 						.. (diag.warning and icons.Warn .. diag.warning or "")
 					return vim.trim(ret)
 				end,
-				offsets = {
-					{
-						filetype = "neo-tree",
-						text = "Neo-tree",
-						highlight = "Directory",
-						text_align = "left",
-					},
-				},
 			},
 		},
 		config = function(_, opts)
